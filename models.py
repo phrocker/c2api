@@ -43,6 +43,7 @@ class AgentInfo(db.Model):
     agent_class = db.Column(db.String(80), ForeignKey("agentclass.agent_class"))
     flow_id = db.Column(db.String(80), ForeignKey("flowinfo.flow_id"))
     component_statuses = relationship("ComponentStatus", back_populates="agent_info")
+    connection_statuses = relationship("ConnectionStatus", back_populates="agent_info")
     repository_statuses = relationship("RepositoryStatus", back_populates="agent_info")
 
     def __repr__(self):
@@ -71,14 +72,31 @@ class FlowInfo(db.Model):
     def __repr__(self):
         return '<FlowInfo %r %r>' % self.flow_id, self.registry_url
 
+
+class ConnectionStatus(db.Model):
+    __tablename__ = "connection_statuses"
+    id = db.Column(db.Integer, db.Sequence('seq_reg_id', start=1, increment=1),
+               primary_key=True)
+    agent_info_id = db.Column(db.String(80), ForeignKey("agentinfo.id"))
+    agent_info=  relationship("AgentInfo", back_populates="connection_statuses")
+    component_name = db.Column(db.String(120), nullable=False)
+    component_status = db.Column(db.String(5), nullable=False)
+    component_uuid = db.Column(db.String(50), nullable=False)
+    size = db.Column(db.Integer, nullable=False)
+    sizeMax = db.Column(db.Integer, nullable=False)
+    data = db.Column(db.Integer, nullable=False)
+    dataMax = db.Column(db.Integer, nullable=False)
+
 class ComponentStatus(db.Model):
     __tablename__ = "component_statuses"
+    id = db.Column(db.Integer, db.Sequence('seq_reg_id', start=1, increment=1),
+               primary_key=True)
     agent_info_id = db.Column(db.String(80), ForeignKey("agentinfo.id"))
     agent_info=  relationship("AgentInfo", back_populates="component_statuses")
     component_name = db.Column(db.String(120), nullable=False)
     component_status = db.Column(db.String(5), nullable=False)
-    component_uuid = db.Column(db.String(5), primary_key=True)
-
+    component_uuid = db.Column(db.String(50), nullable=False)
+    
 class RepositoryStatus(db.Model):
     __tablename__ = "repository_statuses"
     id = db.Column(db.Integer, db.Sequence('seq_reg_id', start=1, increment=1),
@@ -109,7 +127,7 @@ class Heartbeat(db.Model):
 
 class AgentInfoSchema(SQLAlchemyAutoSchema):
     class Meta:
-        model = AgentInfo
+        model = AgentInfo;
         include_fk = True
         load_instance = True
 

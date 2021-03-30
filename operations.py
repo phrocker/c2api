@@ -1,13 +1,43 @@
 from re import I
 import sys
-from models import db ,Heartbeat, AgentInfo, FlowInfo, PendingOperations, AgentClass, Operations, OperationArguments
-from flask import Flask, request, jsonify
+from models import ComponentStatus, ConnectionStatus, db ,Heartbeat, AgentInfo, FlowInfo, PendingOperations, AgentClass, Operations, OperationArguments
+from flask import Flask, request, jsonify, Response
 
-def create_agent(operation,agent_ident,flow_id,agent_class, content):
+def create_agent(operation,agent_ident,flow_id,agent_class, content, flow_info_content):
     new_agent_info = AgentInfo(id=agent_ident,agent_class=agent_class,flow_id=flow_id)
     db.session.add(new_agent_info)
     new_heartbeat = Heartbeat(operation=operation,agent_id=agent_ident)
     db.session.add(new_heartbeat)
+    if flow_info_content is not None:
+        ## we need to go through and add components and queues for this agent.
+        queues = flow_info_content.get('queues',{})
+        for key,value in queues.items():
+            connection = ConnectionStatus(component_uuid=key)
+            for comp_key,comp_value in value.items():
+                if comp_key == "name":
+                    connection.component_name=comp_value
+                if comp_key == "size":
+                    connection.size=comp_value
+                if comp_key == "sizeMax":
+                    connection.sizeMax=comp_value
+                if comp_key == "dataSize":
+                    connection.data=comp_value
+                if comp_key == "dataSizeMax":
+                    connection.dataMax=comp_value
+            connection.component_status="running"
+            new_agent_info.connection_statuses.append(connection)
+        queues = flow_info_content.get('components',{})
+        for key,value in queues.items():
+            component = ComponentStatus(component_name=key)
+            for comp_key,comp_value in value.items():
+                if comp_key == "running":
+                    if comp_value is True:
+                        component.component_status="running"
+                    else:
+                        component.component_status="stopped"
+                if comp_key == "uuid":
+                    component.component_uuid=comp_value
+            new_agent_info.component_statuses.append(component)
     db.session.commit()
 
 class Agent:
@@ -21,15 +51,16 @@ class Agent:
 
     def create_flow(self,new_flow_id, flow_info):
         try:
-            bucket_id = flow_info['versionedFlowSnapshotURI']['bucketId']
-            registry_url = flow_info['versionedFlowSnapshotURI']['registryUrl']
+            bucket_id = flow_info['versionedFlowSnapshotURI'].get('bucketId',"")
+            registry_url = flow_info['versionedFlowSnapshotURI'].get('registryUrl',"")
+            print("creating flow with " + new_flow_id)
             new_flow_info = FlowInfo(flow_id=new_flow_id,bucketId=bucket_id,registry_url=registry_url)
             db.session.add(new_flow_info)
             db.session.commit()
         except:
             e = sys.exc_info()[0]
             print(e)
-            pass
+            raise e
         flow = FlowInfo.query.filter_by(flow_id=new_flow_id).first()
         return flow
 
@@ -78,6 +109,7 @@ class AgentHeartbeat:
                     requested_ops.append(new_op)
             if len(requested_ops) > 0:
                 resp["requested_operations"] = requested_ops
+        print(str(resp))
         return jsonify(resp)
 
 def queue_operation(operand, name, args):
@@ -109,11 +141,14 @@ def assign_operation(operation_id,agent_id):
 def verify_flow(agent_id,flow_id,agent_class):
     ## get the expected class
     flow_class = AgentClass.query.filter_by(agent_class=agent_class).first()
+    if flow_class is None:
+        return True
     flow = FlowInfo.query.filter_by(flow_id=flow_id).first()
     if flow is None:
         return True
 
     if flow.flow_id != flow_class.flow_id:
+        print("expected " + flow_class.flow_id + " got " + flow.flow_id)
         return False
 
     return True
@@ -128,7 +163,6 @@ def update_flow(agent_id,flow_id):
         flow = FlowInfo.query.filter_by(flow_id=flow_id).first()
 
         if flow is None:
-            print("Can't update becvause we have no flow")
             return
 
         arguments['location'] = flow.registry_url
@@ -137,10 +171,6 @@ def update_flow(agent_id,flow_id):
         assign_operation(new_op_id,agent_id)
         ## now set it pending for the 
 
-        print("Okay let's tell dat")
-
-    else:
-        print("We already have this oepration")
     ## make sure we don't already have an operation pending for this      
 
 
@@ -149,10 +179,10 @@ def create_class(agent_class,flow_id):
     db.session.add(new_class)
     db.session.commit()
 
-def update_agent(operation,agent_ident,flow_id,agent_class, content):
+def update_agent(operation,agent_ident,flow_id,agent_class, content, flow_info_content):
     agent_info = AgentInfo.query.filter_by(id=agent_ident).first()           
     if agent_info is None:
-        create_agent(operation,agent_ident,flow_id,agent_class,content)
+        create_agent(operation,agent_ident,flow_id,agent_class,content,flow_info_content)
     return Agent(agent_ident)
 
 def update_heartbeat(agent_ident,agent_class, content):
@@ -162,18 +192,57 @@ def update_heartbeat(agent_ident,agent_class, content):
     return AgentHeartbeat(new_heartbeat.id,agent_ident)
 
 def perform_acknowledge(content):
-    pending_operation = PendingOperations.query.filter_by(id=content["identifier"]).first()
+    op_id = content.get("operationId")
+    if op_id is None:
+        op_id = content.get("identifier","")
+    pending_operation = PendingOperations.query.filter_by(id=op_id).first()
     if pending_operation is not None:
         pending_operation.status="finished"
         db.session.commit()
-    return "Finished"
+    return Response("{'status':'acknowledged'}", status=200, mimetype='application/json')
+
+def update_status(agent_ident,flow_id,flow_info_content):
+    if flow_info_content is not None:
+        agent_info = AgentInfo.query.filter_by(id=agent_ident).first()
+        ## we need to go through and add components and queues for this agent.
+        queues = flow_info_content.get('queues',{})
+        for key,value in queues.items():
+            connection = ConnectionStatus(component_uuid=key)
+            for connection in agent_info.connection_statuses:
+                if connection.component_uuid == key:
+                    for comp_key,comp_value in value.items():
+                        if comp_key == "name":
+                            connection.component_name=comp_value
+                        if comp_key == "size":
+                            connection.size=comp_value
+                        if comp_key == "sizeMax":
+                            connection.sizeMax=comp_value
+                        if comp_key == "dataSize":
+                            connection.data=comp_value
+                        if comp_key == "dataSizeMax":
+                            connection.dataMax=comp_value
+         #   new_agent_info.connection_statuses.append(connection)
+        queues = flow_info_content.get('components',{})
+        for key,value in queues.items():
+            for component in agent_info.component_statuses:
+                if component.component_uuid == key:
+                    for comp_key,comp_value in value.items():
+                        if comp_key == "running":
+                            if comp_value is True:
+                                component.component_status="running"
+                            else:
+                                component.component_status="stopped"
+                        if comp_key == "uuid":
+                            component.component_uuid=comp_value
+          #  new_agent_info.component_statuses.append(component)
+        db.session.commit()
 
 def perform_heartbeat(content):
     if content['agentInfo'] is not None:
         agentInfo = content['agentInfo']
         agent_ident = agentInfo['identifier']
         agent_class = agentInfo['agentClass']
-
+        print("Performing heartbeat for " + agent_ident)
         agent_class_db = AgentClass.query.filter_by(agent_class=agent_class).first()
 
         flow_id = None
@@ -181,7 +250,7 @@ def perform_heartbeat(content):
         if content['flowInfo'] is not None:
             flow_id = content['flowInfo']["flowId"]
         
-        agent = update_agent(content['operation'],agent_ident,flow_id,agent_class,content['agentInfo'])
+        agent = update_agent(content['operation'],agent_ident,flow_id,agent_class,content['agentInfo'],content['flowInfo'])
         ## check if the flow id has been changed
         
         last_heartbeat = Heartbeat.query.filter_by(agent_id=agent_ident).order_by(Heartbeat.timestamp.desc()).first()
@@ -191,18 +260,21 @@ def perform_heartbeat(content):
         if (flow is None):
             ## add the new flow
             flow = agent.update_flow(flow_id,content['flowInfo'])
-
-        if agent_class_db is None:
-            create_class(agent_class,flow.flow_id)
+        
+        ## Don't create the class until it is forced on us.
+#        if agent_class_db is None:
+ #           create_class(agent_class,flow.flow_id)
 
         if verify_flow(agent_ident,flow_id,agent_class) is False:
+            print("Could not verify flow")
             update_flow(agent_ident,flow_id)
+
+        update_status(agent_ident,flow_id,content['flowInfo'])
 
         print("flow id is %s",flow.flow_id)
 
         ## update heartbeat
         heartbeat = update_heartbeat(agent_ident,agent_class,content['agentInfo'])
-        
         return heartbeat.__str__()
     else:
-        return content['operation']
+        return Response("{'status':'heartbeat'}", status=200, mimetype='application/json')
