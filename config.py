@@ -9,7 +9,7 @@ class Config(object):
     UPLOAD_FOLDER = "./tmp/"
     SQLALCHEMY_DATABASE_URI = 'sqlite:////tmp/test.db'
     SECRET_KEY = 'this-really-needs-to-be-changed'
-    max_heartbeat = 100
+    MAX_HEARTBEAT = 2000
 
 
 class ProductionConfig(Config):

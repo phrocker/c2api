@@ -1,3 +1,4 @@
+import time
 from re import I
 import sys
 from models import ComponentStatus, ConnectionStatus, db ,Heartbeat, AgentInfo, FlowInfo, PendingOperations, AgentClass, Operations, OperationArguments
@@ -186,7 +187,7 @@ def update_agent(operation,agent_ident,flow_id,agent_class, content, flow_info_c
     return Agent(agent_ident)
 
 def update_heartbeat(agent_ident,agent_class, content):
-    new_heartbeat = Heartbeat(operation="heartbeat",agent_id=agent_ident)
+    new_heartbeat = Heartbeat(operation="heartbeat",agent_id=agent_ident,timestamp=time.time()*1000)
     db.session.add(new_heartbeat)
     db.session.commit()
     return AgentHeartbeat(new_heartbeat.id,agent_ident)

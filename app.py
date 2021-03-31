@@ -139,7 +139,7 @@ def start_component(agentid,component_id):
 """
 @app.route('/api/query/missed')
 def missed_heartbeat():
-    max_heartbeat = current_app.config.get("max_heartbeat")
+    max_heartbeat = app.config.get('MAX_HEARTBEAT')
     if max_heartbeat is None:
         max_heartbeat = 100
     max_timestamp = time.time() * 1000 - max_heartbeat
@@ -147,7 +147,6 @@ def missed_heartbeat():
     hbs = []
     if missed_heartbeats is not None:
         for hb in missed_heartbeats:
-            print(hb.agent_id + " " + str(max_timestamp))
             hbs.append( { "id" : hb.agent_id})
     return jsonify(hbs)
 
@@ -175,15 +174,12 @@ def list_components(agentid):
     agent = AgentInfo.query.filter_by(id=agentid).first()
     components = []
     if agent is not None:
-        print ("we have " + agent.id)
         for component in agent.component_statuses:
             component_status = dict()
             component_status['name'] = component.component_name 
             component_status['uuid'] = component.component_uuid
             component_status['status'] = component.component_status
             components.append(component_status)
-    else:
-        print("don't have")
     return jsonify(components)
 
 @app.route('/api/query/lastheard/<agent_id>')
@@ -204,7 +200,6 @@ def heartbeat():
         if content['operation'] == "heartbeat":
             return operations.perform_heartbeat(content)
         if content['operation'] == "acknowledge":
-            #print(content)
             return operations.perform_acknowledge(content)
     Response("{'error':'Invalid heartbeat'}", status=400, mimetype='application/json')
 
