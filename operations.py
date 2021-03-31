@@ -248,7 +248,7 @@ def perform_heartbeat(content):
         flow_id = None
         ## it is possible for flow info to not exist
         if content['flowInfo'] is not None:
-            flow_id = content['flowInfo']["flowId"]
+            flow_id = content['flowInfo']['flowId']
         
         agent = update_agent(content['operation'],agent_ident,flow_id,agent_class,content['agentInfo'],content['flowInfo'])
         ## check if the flow id has been changed
@@ -267,7 +267,9 @@ def perform_heartbeat(content):
 
         if verify_flow(agent_ident,flow_id,agent_class) is False:
             print("Could not verify flow")
-            update_flow(agent_ident,flow_id)
+            flow_class = AgentClass.query.filter_by(agent_class=agent_class).first()
+            if flow_class is not None:
+                update_flow(agent_ident,flow_class.flow_id)
 
         update_status(agent_ident,flow_id,content['flowInfo'])
 
@@ -278,3 +280,10 @@ def perform_heartbeat(content):
         return heartbeat.__str__()
     else:
         return Response("{'status':'heartbeat'}", status=200, mimetype='application/json')
+
+def verify_class(agentclass):
+    agent_info = AgentInfo.query.filter_by(agent_class=agentclass).first()           
+    if agent_info is not None:
+        return True
+    else:
+        return False

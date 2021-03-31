@@ -1,3 +1,6 @@
+import uuid
+import base64
+
 import time
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
@@ -6,8 +9,9 @@ from flask import Response
 from flask import current_app
 app = Flask(__name__)
 app.config.from_object(os.environ['APP_SETTINGS'])
-from models import db ,Heartbeat, AgentInfo, FlowInfo, AgentClass
+from models import db ,Heartbeat, AgentInfo, FlowInfo, AgentClass,HostedFlows
 import operations
+from werkzeug.utils import secure_filename
 db.init_app(app)
 
 
@@ -46,6 +50,55 @@ def update_class_flow(agentclass):
     agent_class.flow_id = new_flow_id
     db.session.commit()
     return Response("{'status':'updated'}", status=200, mimetype='application/json')
+
+@app.route('/api/query/flow/<flowid>/flows/<uuid>/buckets/default')
+def get_flow_content(flowid, uuid):
+    
+    hostedflow = HostedFlows.query.filter_by(id=flowid,uuid=uuid).first()
+    if hostedflow is None:
+        return Response("{'status':'missing'}", status=400, mimetype='application/json')
+        
+    flow = FlowInfo.query.filter_by(flow_id=hostedflow.uuid).first()
+    if flow is None:
+        return Response("{'status':'missing'}", status=400, mimetype='application/json')
+    filename = os.path.join(app.config['UPLOAD_FOLDER'], flow.flow_id)
+    file = open(filename,mode='r')
+    resp = file.read()
+    file.close()
+    return Response(resp, status=200, mimetype='multipart/form-data')
+
+@app.route('/api/update/class/flow/upload/<agentclass>', methods=['POST'])
+def upload_flow(agentclass):
+    new_flow = HostedFlows(uuid=str(uuid.uuid1()))
+    
+    filename = secure_filename(str(new_flow.uuid))
+    filename = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    with open(filename, "w") as f:
+        f.write(str(request.stream.read().decode('utf-8')))
+
+    new_flow.flow=filename
+    db.session.add(new_flow)
+    db.session.commit()
+    bucket_id = ""
+    
+    
+    registry_url = request.host + "/api/query/flow/" + str(new_flow.id) + "/flows/" + new_flow.uuid + "/buckets/default"
+    print("Got loc " + registry_url)
+    new_flow_id = new_flow.uuid
+    new_flow_info = FlowInfo(flow_id=new_flow_id,bucketId=bucket_id,registry_url=registry_url)
+    db.session.add(new_flow_info)
+    db.session.commit()
+    agent_class = AgentClass.query.filter_by(agent_class=agentclass).first()
+    if agent_class is None:
+        if operations.verify_class(agentclass): 
+            agent_class = AgentClass(agent_class=agentclass)
+            db.session.add(agent_class)
+        else:
+            Response("{'error':'Invalid class'}", status=400, mimetype='application/json')
+    agent_class.flow_id = new_flow_id
+    db.session.commit()
+    return Response("{'status':'updated'}", status=200, mimetype='application/json')
+    
 
 @app.route('/api/update/agent/<agentid>/stop/component/<component_id>',  methods=['POST'])
 def stop_component(agentid,component_id):
@@ -147,12 +200,11 @@ def last_heard(agent_id):
 @app.route('/api/heartbeat', methods=['POST'])
 def heartbeat():
     content = request.json
-    print(content)
     if content['operation'] is not None:
         if content['operation'] == "heartbeat":
             return operations.perform_heartbeat(content)
         if content['operation'] == "acknowledge":
-            print(content)
+            #print(content)
             return operations.perform_acknowledge(content)
     Response("{'error':'Invalid heartbeat'}", status=400, mimetype='application/json')
 

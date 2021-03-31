@@ -1,4 +1,4 @@
-import time
+import time, base64
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import ForeignKeyConstraint
 from sqlalchemy.orm import scoped_session, sessionmaker, relationship, backref
@@ -35,6 +35,14 @@ class Operations(db.Model):
     name = db.Column(db.String(80))
     operand = db.Column(db.Text)
     operation_arguments = relationship("OperationArguments", back_populates="operation_info")
+
+
+class HostedFlows(db.Model):
+    __tablename__ = "hostedFlows"
+    id = db.Column(db.Integer, db.Sequence('seq_reg_id', start=199, increment=1),
+               primary_key=True)
+    uuid = db.Column(db.String(40))
+    flow = db.Column(db.String(1024))
 
 
 class AgentInfo(db.Model):
