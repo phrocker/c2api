@@ -4,7 +4,7 @@ import os
 from flask import request
 from flask_restplus import Resource
 from c2api.api.api import api
-from c2api.api.serializers import last_heard_heartbeat, heartbeat, connection, component
+from c2api.api.serializers import last_heard_heartbeat, heartbeat, connection, component, agent_class
 from flask import Response
 from c2api.api import operations
 from flask_restplus import reqparse
@@ -53,6 +53,19 @@ class MissedHeartbeat(Resource):
             for hb in missed_heartbeats:
                 hbs.append( { "id" : hb.agent_id})
         return jsonify(hbs)
+
+@ns.route('/agents/class/<agentclass>')
+@api.response(200, 'Returns an array of Agents that exist within this class..')
+class ListAgentsByClass(Resource):
+
+    
+    """
+        This should be the endpoint to get missed heartbeats
+    """
+    @api.marshal_with(agent_class)
+    def get(self, agentclass):
+        agents = AgentInfo.query.filter_by(agent_class=agentclass).all()
+        return agents
 
 @ns.route('/connections/<agentid>')
 @api.response(200, 'Returns an array of connections for the associated agent ID.')

@@ -27,9 +27,14 @@ heartbeat = api.model('Heartbeat', {
     'timestamp': fields.Integer(required=True, description='Timestamp'),
 })
 
-last_heard_heartbeat = api.model('Last Heard', {
+last_heard_heartbeat = api.model('Agent ID with Last Heard', {
     'agent_id': fields.String(required=True, description='Agent ID'),
     'timestamp': fields.Integer(required=True, description='Timestamp'),
+})
+
+agent_class = api.model('AgentClass', {
+    'id': fields.String(required=True, description='Agent ID'),
+    'flow_id': fields.String(required=True, description='Agent Flow ID'),
 })
 
 status = api.model('Operation Status', {

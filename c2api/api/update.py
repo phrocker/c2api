@@ -161,38 +161,3 @@ class FlowOperation(Resource):
             agent_class.flow_id = new_flow_id
             db.session.commit()
             return {'status': 'Flowfile uploaded' },200
-
-"""
-
-@app.route('/operation/update/class/flow/upload/<agentclass>', methods=['POST'])
-def upload_flow(agentclass):
-    new_flow = HostedFlows(uuid=str(uuid.uuid1()))
-    
-    filename = secure_filename(str(new_flow.uuid))
-    filename = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    with open(filename, "w") as f:
-        f.write(str(request.stream.read().decode('utf-8')))
-
-    new_flow.flow=filename
-    db.session.add(new_flow)
-    db.session.commit()
-    bucket_id = ""
-    
-    
-    registry_url = request.host + "/operation/query/flow/" + str(new_flow.id) + "/flows/" + new_flow.uuid + "/buckets/default"
-    print("Got loc " + registry_url)
-    new_flow_id = new_flow.uuid
-    new_flow_info = FlowInfo(flow_id=new_flow_id,bucketId=bucket_id,registry_url=registry_url)
-    db.session.add(new_flow_info)
-    db.session.commit()
-    agent_class = AgentClass.query.filter_by(agent_class=agentclass).first()
-    if agent_class is None:
-        if operations.verify_class(agentclass): 
-            agent_class = AgentClass(agent_class=agentclass)
-            db.session.add(agent_class)
-        else:
-            Response("{'error':'Invalid class'}", status=400, mimetype='application/json')
-    agent_class.flow_id = new_flow_id
-    db.session.commit()
-    return Response("{'status':'updated'}", status=200, mimetype='application/json')
-"""

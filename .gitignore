@@ -2,3 +2,4 @@
 env/**
 __pycache__/**
 tmp/**
+c2api/api/__pycache__/**
