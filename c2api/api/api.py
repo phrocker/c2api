@@ -8,8 +8,8 @@ from sqlalchemy.orm.exc import NoResultFound
 log = logging.getLogger(__name__)
 
 
-api = Api(version='1.0', title='C2 API',
-          description='Simple Command and Control API for Apache NiFi MiNiFi agents')
+api = Api(version='0.1', title='Agent Command and Control API',
+          description='Command and Control API for Apache NiFi MiNiFi agents')
 
 
 @api.errorhandler

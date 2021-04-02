@@ -8,7 +8,7 @@ from flask import Response
 from c2api.api import operations
 log = logging.getLogger(__name__)
 
-ns = api.namespace('heartbeat', description='Heartbeat Operations for Agents.')
+ns = api.namespace('heartbeat', description='API endpoint for Heartbeat Operations')
 
 @ns.route('')
 @api.response(200, 'Heartbeat successfully executed.')

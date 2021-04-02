@@ -16,7 +16,7 @@ from sqlalchemy import func, and_
 from c2api.models import db
 log = logging.getLogger(__name__)
 
-ns = api.namespace('query', description='Heartbeat Operations for Agents.')
+ns = api.namespace('query', description='API endpoints to query Agents')
 
 @ns.route('/missed/')
 @api.response(200, 'Returns an array of agent IDs that have missed a heartbeat.')

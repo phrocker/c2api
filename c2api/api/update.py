@@ -18,7 +18,7 @@ from werkzeug.utils import secure_filename
 
 log = logging.getLogger(__name__)
 
-ns = api.namespace('update', description='Heartbeat Operations for Agents.')
+ns = api.namespace('update', description='API endpoints to update agents')
 
 @ns.route('/clear/connection/<agentid>/<queueid>')
 @api.response(200, 'Connection clear initiated')
