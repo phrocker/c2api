@@ -1,7 +1,7 @@
 import time
 from re import I
 import sys
-from models import ComponentStatus, ConnectionStatus, db ,Heartbeat, AgentInfo, FlowInfo, PendingOperations, AgentClass, Operations, OperationArguments
+from c2api.models import ComponentStatus, ConnectionStatus, db ,Heartbeat, AgentInfo, FlowInfo, PendingOperations, AgentClass, Operations, OperationArguments
 from flask import Flask, request, jsonify, Response
 
 def create_agent(operation,agent_ident,flow_id,agent_class, content, flow_info_content):
@@ -83,9 +83,10 @@ class Agent:
 
 class AgentHeartbeat:
     def __init__(self,heartbeat_id,agent_id):
-        new_heartbeat = Heartbeat(operation="heartbeat",id=heartbeat_id)
+        new_heartbeat = Heartbeat.query.filter(Heartbeat.id==heartbeat_id).first()
         self.operation_id = new_heartbeat.id
         self.operation = new_heartbeat.operation
+        self.timestamp = new_heartbeat.timestamp
         self._agent = Agent(agent_id)
 
         
@@ -94,6 +95,7 @@ class AgentHeartbeat:
         resp = dict()
         resp["operation"] = self.operation
         resp["operationId"] = str(self.operation_id)
+        resp["timestamp"] = str(self.timestamp)
         pending_operations = PendingOperations.query.filter_by(agent_id=self._agent.agent_id, status="new").all()
         if pending_operations is not None:
             requested_ops = []
@@ -288,3 +290,18 @@ def verify_class(agentclass):
         return True
     else:
         return False
+
+"""
+@app.route('/operation/heartbeat', methods=['POST'])
+@api.response(200, 'Heartbeat successfully executed.')
+@api.response(400, 'Invalid Heartbeat.')
+@ns.route('/heartbeat')
+def heartbeat():
+    content = request.json
+    if content['operation'] is not None:
+        if content['operation'] == "heartbeat":
+            return operations.perform_heartbeat(content)
+        if content['operation'] == "acknowledge":
+            return operations.perform_acknowledge(content)
+    Response("{'error':'Invalid heartbeat'}", status=400, mimetype='application/json')
+    """
